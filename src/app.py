@@ -79,7 +79,7 @@ def get_scores():
             elif user_data["gender"] == "male":
                 score += district_data["man_score"]
             else:
-                score += district_data["otherSex"]
+                score += district_data["otherSex_score"]
             
             if user_data["age"] < 18:
                 score += district_data["minor_score"]
@@ -92,7 +92,7 @@ def get_scores():
             elif user_data["age"] < 65:
                 score += district_data["midlife_score"]
             elif user_data["age"] < 65:
-                score += district_data["eldery_score"]
+                score += district_data["elderly_score"]
             
             if user_data["descent"] == "asian":
                 score += district_data["asian_score"]
