@@ -7,12 +7,16 @@ import helpers
 import uuid
 from collections import defaultdict
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 CONNECTION = psycopg2.connect(
-    dbname="haven",
-    user="postgres",
-    password="postgres",
-    host="localhost",
-    port="5432"
+    dbname = os.getenv("DB_NAME"),
+    user = os.getenv("DB_USER"),
+    password = os.getenv("DB_PASSWORD"),
+    host = os.getenv("DB_HOST"),
+    port = os.getenv("DB_PORT")
 )
 
 # Create a cursor to interact with the database
@@ -157,6 +161,7 @@ def get_posts():
 
     tags_all = defaultdict(int)
     posts = []
+    scores = 0
     for post in fetched_data:
         post_data = {
             "title": post[6],
@@ -171,9 +176,12 @@ def get_posts():
         
         for tag in post[4]:
             tags_all[tag] += 1
+
+        scores += post[2]
+    score_total = sum(scores) / len(scores)
     
     return jsonify({'success': True, 'data': {
-        "score": 0,
+        "score": int(score_total),
         "tags": dict(tags_all),
         "posts": posts
     }})

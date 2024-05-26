@@ -1,12 +1,16 @@
 import json
 import psycopg2
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 CONNECTION = psycopg2.connect(
-    dbname="haven",
-    user="postgres",
-    password="postgres",
-    host="localhost",
-    port="5432"
+    dbname = os.getenv("DB_NAME"),
+    user = os.getenv("DB_USER"),
+    password = os.getenv("DB_PASSWORD"),
+    host = os.getenv("DB_HOST"),
+    port = os.getenv("DB_PORT")
 )
 
 def map_score(score):
@@ -48,17 +52,17 @@ def insert_data():
             
             # Commit every 500 records
             if i % 500 == 0:
-                connection.commit()
+                CONNECTION.commit()
                 print(i)
         
         # Commit any remaining records
-        connection.commit()
+        CONNECTION.commit()
         print(i)
         
     except Exception as e:
         print(f'Error: {e}')
     finally:
-        if connection:
+        if CONNECTION:
             cursor.close()
-            connection.close()
+            CONNECTION.close()
             print('PostgreSQL connection is closed')
