@@ -164,6 +164,7 @@ def get_posts():
     scores = 0
     for post in fetched_data:
         post_data = {
+            "postid": post[0],
             "title": post[6],
             "location": post[1],
             "score": post[2],
@@ -185,6 +186,21 @@ def get_posts():
         "tags": dict(tags_all),
         "posts": posts
     }})
+
+@app.route('/posts/upvote', methods=['POST'])
+def increase_upvotes():
+    data = request.json
+    postid = data['postid']
+    
+    cursor.execute("UPDATE posts SET upvotes = upvotes + 1 WHERE postid = '%s' RETURNING upvotes;" % (postid))
+    CONNECTION.commit()
+    upvotes = cursor.fetchone()
+    
+    return jsonify({'success': True, 'data': {
+        "upvotes": upvotes[0],
+    }})
+    
+
 
 if __name__ == '__main__':
     pass
