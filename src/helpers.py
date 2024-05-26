@@ -14,10 +14,10 @@ CONNECTION = psycopg2.connect(
 )
 
 def map_type(place_type):
-    if place_type == "hotel":
-        return 4
-    elif place_type in ['police', 'hospital', 'fire station']:
+    if place_type in ['police', 'hospital', 'fire station', 'clinic', 'townhall']:
         return 5
+    elif place_type in ['hotel', 'retail', 'park', 'library', 'school', 'post office', 'place of worship', 'supermarket']:
+        return 4
     return 0
 
 def map_score(score):
