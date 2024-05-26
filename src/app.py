@@ -68,12 +68,9 @@ def get_scores():
     score_data = []
     
     if user_id != "N/A":
-        cursor.execute("SELECT userid FROM users WHERE userid = '%s';" % (user_id))
-        user = cursor.fetchone()
-        for district in fetched_data:
-            user_data = user[0]
-            
-            district_data = district.to_dict()
+        cursor.execute("SELECT * FROM users WHERE userid = '%s';" % (user_id))
+        user_data = cursor.fetchone()
+        for district_data in fetched_data:
             dis_score_data = {}
             
             dis_score_data['lat'] = district_data[18]
@@ -119,8 +116,7 @@ def get_scores():
             
             score_data.append(dis_score_data)
     else:
-        for district in fetched_data:
-            district_data = district.to_dict()
+        for district_data in fetched_data:
             dis_score_data = {}
             
             dis_score_data['lat'] = district_data[18]
@@ -206,52 +202,73 @@ def get_nearby_locations():
     query = request.args.to_dict()
     lat = float(query['lat'])
     lon = float(query['lon'])
-    radius = 100
+    radius = 300
     limit = 50
     
-    change_amount = 0.002
-    coord_adjustment = [(0, 0), (change_amount, 0), (change_amount, change_amount), (0, change_amount), (-change_amount, change_amount), (-change_amount, 0), (-change_amount, -change_amount), (0, -change_amount), (change_amount, -change_amount)]
     safe_places = []
-    for adjustment in coord_adjustment:
-        URL = f"https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/{lon+adjustment[1]},{lat+adjustment[0]}.json?radius={radius}&limit={limit}&access_token={os.getenv('MAPBOX_ACCESS_TOKEN')}"
-            
-        r = requests.get(url = URL)
-        data = r.json()
-
-        safe_types = ['police', 'hospital', 'hotel', 'fire station']
-        for point in data['features']:
-            if 'properties' in point and 'type' in point['properties'] and point['properties']['type'].lower() in safe_types and point not in safe_places:
-                safe_places.append(point)
-            
     safe_places_format = {
         "features": [],
         "type": "FeatureCollection"
     }
-    for place in safe_places:
-        coords = place['geometry']['coordinates']
+    URL = f"https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/{lon},{lat}.json?radius={radius}&limit={limit}&access_token={os.getenv('MAPBOX_ACCESS_TOKEN')}&layers=poi_label"
         
+    r = requests.get(url = URL)
+    data = r.json()
+
+    safe_types_night = ['police', 'hospital', 'hotel', 'fire station']
+    safe_types_day = ['retail', 'clinic', 'park', 'library', 'school', 'townhall', 'post office', 'place of worship', 'supermarket']
+    
+    safe_types = safe_types_night # + safe_types_day
+    
+    for place in data['features']:
+        coords = place['geometry']['coordinates']
+            
         address_url = f"https://api.mapbox.com/search/geocode/v6/reverse?types=address&language=en&longitude={coords[0]}&latitude={coords[1]}&access_token={os.getenv('MAPBOX_ACCESS_TOKEN')}"
         
         r = requests.get(url = address_url)
-        data = r.json()
-        address = data['features'][0]['properties']['name']
+        address_data = r.json()
+        if len(address_data['features']) == 0:
+            continue
+        address = address_data['features'][0]['properties']['name']
         
-        place_type = place['properties']['type'].lower()
-        place_name = place['properties']['name'] if 'name' in place['properties'] else place_type
-        safety_score = helpers.map_type(place_type)
+        cursor.execute("SELECT * FROM posts WHERE location = '%s';" % (address))
+        fetched_data = cursor.fetchall()
+        
+        add = 0
+        safety_score = 0
+        
+        if 'properties' in place and 'type' in place['properties'] and place['properties']['type'].lower() in safe_types and place not in safe_places:
+            add = 1
+            place_type = place['properties']['type'].lower()
+            safety_score = helpers.map_type(place_type)
+        elif fetched_data:
+            overall = 0
+            for post in fetched_data:
+                overall += post[2]
+            safety_score = overall / len(fetched_data)
+            if safety_score > 3:
+                add = 1
+        else:
+            continue
+        print(place)
+        
+        if add:    
+            place_type = place['properties']['type'].lower()
+            place_name = place['properties']['name'] if 'name' in place['properties'] else place_type
+            safety_score = helpers.map_type(place_type)
 
-        safe_places_format['features'].append({
-            "type": "Feature",
-            "properties": {
-                "name": place_name.title(),
-                "address": address,
-                "safety": safety_score
-            },
-            "geometry": {
-                "coordinates": coords,
-                "type": "Point"
-            }
-        })
+            safe_places_format['features'].append({
+                "type": "Feature",
+                "properties": {
+                    "name": place_name.title(),
+                    "address": address,
+                    "safety": safety_score
+                },
+                "geometry": {
+                    "coordinates": coords,
+                    "type": "Point"
+                }
+            })
     
     return jsonify({'success': True, 'data': safe_places_format})
 
