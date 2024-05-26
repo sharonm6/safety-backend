@@ -6,6 +6,7 @@ import psycopg2
 import helpers
 import uuid
 from collections import defaultdict
+import requests
 
 from dotenv import load_dotenv
 import os
@@ -57,7 +58,7 @@ def login():
         user_id = user[0]
         return jsonify({'success': True, 'data':{'user_id': user_id}})
 
-@app.route('/map', methods=['GET'])
+@app.route('/map/heatmap', methods=['GET'])
 def get_scores():
     query = request.args.to_dict()
     user_id = query['user_id']
@@ -199,8 +200,60 @@ def increase_upvotes():
     return jsonify({'success': True, 'data': {
         "upvotes": upvotes[0],
     }})
-    
 
+@app.route('/map/nearby', methods=['GET'])
+def get_nearby_locations():
+    query = request.args.to_dict()
+    lat = float(query['lat'])
+    lon = float(query['lon'])
+    radius = 100
+    limit = 50
+    
+    change_amount = 0.002
+    coord_adjustment = [(0, 0), (change_amount, 0), (change_amount, change_amount), (0, change_amount), (-change_amount, change_amount), (-change_amount, 0), (-change_amount, -change_amount), (0, -change_amount), (change_amount, -change_amount)]
+    safe_places = []
+    for adjustment in coord_adjustment:
+        URL = f"https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/{lon+adjustment[1]},{lat+adjustment[0]}.json?radius={radius}&limit={limit}&access_token={os.getenv('MAPBOX_ACCESS_TOKEN')}"
+            
+        r = requests.get(url = URL)
+        data = r.json()
+
+        safe_types = ['police', 'hospital', 'hotel', 'fire station']
+        for point in data['features']:
+            if 'properties' in point and 'type' in point['properties'] and point['properties']['type'].lower() in safe_types and point not in safe_places:
+                safe_places.append(point)
+            
+    safe_places_format = {
+        "features": [],
+        "type": "FeatureCollection"
+    }
+    for place in safe_places:
+        coords = place['geometry']['coordinates']
+        
+        address_url = f"https://api.mapbox.com/search/geocode/v6/reverse?types=address&language=en&longitude={coords[0]}&latitude={coords[1]}&access_token={os.getenv('MAPBOX_ACCESS_TOKEN')}"
+        
+        r = requests.get(url = address_url)
+        data = r.json()
+        address = data['features'][0]['properties']['name']
+        
+        place_type = place['properties']['type'].lower()
+        place_name = place['properties']['name'] if 'name' in place['properties'] else place_type
+        safety_score = helpers.map_type(place_type)
+
+        safe_places_format['features'].append({
+            "type": "Feature",
+            "properties": {
+                "name": place_name.title(),
+                "address": address,
+                "safety": safety_score
+            },
+            "geometry": {
+                "coordinates": coords,
+                "type": "Point"
+            }
+        })
+    
+    return jsonify({'success': True, 'data': safe_places_format})
 
 if __name__ == '__main__':
-    pass
+    app.run()

@@ -13,6 +13,13 @@ CONNECTION = psycopg2.connect(
     port = os.getenv("DB_PORT")
 )
 
+def map_type(place_type):
+    if place_type == "hotel":
+        return 4
+    elif place_type in ['police', 'hospital', 'fire station']:
+        return 5
+    return 0
+
 def map_score(score):
     if score < 0.0006: 
         return 1
