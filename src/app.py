@@ -155,6 +155,8 @@ def get_posts():
 
     cursor.execute("SELECT * FROM posts WHERE location = '%s' ORDER BY upvotes;" % (location))
     fetched_data = cursor.fetchall()
+    if fetched_data == []:
+        return jsonify({'success': False})
 
     tags_all = defaultdict(int)
     posts = []
@@ -176,11 +178,16 @@ def get_posts():
             tags_all[tag] += 1
 
         scores += post[2]
-    score_total = sum(scores) / len(scores)
+    score_total = scores / len(fetched_data)
+
+    tags_list = []
+    for key, value in tags_all.items():
+        tags_list.append((key, value))
+    tags_list.sort(key=lambda x: x[1], reverse=True)
     
     return jsonify({'success': True, 'data': {
         "score": int(score_total),
-        "tags": dict(tags_all),
+        "tags": tags_list,
         "posts": posts
     }})
 
