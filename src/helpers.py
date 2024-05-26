@@ -1,11 +1,13 @@
 import json
+import psycopg2
 
-import firebase_admin
-from firebase_admin import credentials, firestore
-
-cred = credentials.Certificate("../service-account.json")
-app = firebase_admin.initialize_app(cred, name="helpers")
-db = firestore.client(app=firebase_admin.get_app(name='helpers'))
+CONNECTION = psycopg2.connect(
+    dbname="haven",
+    user="postgres",
+    password="postgres",
+    host="localhost",
+    port="5432"
+)
 
 def map_score(score):
     if score < 0.0006: 
@@ -26,16 +28,37 @@ def insert_data():
         records = json.load(json_file)
     print('%i records read from file' % len(records))
 
-    i = 0
-    batch = db.batch()
-    print('Writing records to Firestore')
-    for record_id in records.keys():
-        doc = db.collection('districts').document(record_id)
-        batch.set(doc, records[record_id])
-        i += 1
-        if (i % 500 == 0):
-            batch.commit()
-            batch = db.batch()
-            print(i)
-    batch.commit()
-    print(i)
+    # Establish a connection to the PostgreSQL database
+    try:
+        cursor = CONNECTION.cursor()
+        print('Connected to PostgreSQL database')
+
+        # Iterate over the records and insert them into the database
+        i = 0
+        print('Writing records to PostgreSQL')
+        for record_id, record_data in records.items():
+            # Convert record_data to a format suitable for insertion
+            columns = ("districtid" + ', ') + ', '.join([x.lower() for x in record_data.keys()])
+            values = (record_id + ', ') + ', '.join(['%s'] * len(record_data))
+            insert_query = f'INSERT INTO crimes ({columns}) VALUES ({values})'
+            
+            # Execute the insertion query
+            cursor.execute(insert_query, list(record_data.values()))
+            i += 1
+            
+            # Commit every 500 records
+            if i % 500 == 0:
+                connection.commit()
+                print(i)
+        
+        # Commit any remaining records
+        connection.commit()
+        print(i)
+        
+    except Exception as e:
+        print(f'Error: {e}')
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+            print('PostgreSQL connection is closed')
