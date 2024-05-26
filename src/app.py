@@ -202,6 +202,7 @@ def get_nearby_locations():
     query = request.args.to_dict()
     lat = float(query['lat'])
     lon = float(query['lon'])
+    time = int(query['time'])
     radius = 300
     limit = 50
     
@@ -218,7 +219,10 @@ def get_nearby_locations():
     safe_types_night = ['police', 'hospital', 'hotel', 'fire station']
     safe_types_day = ['retail', 'clinic', 'park', 'library', 'school', 'townhall', 'post office', 'place of worship', 'supermarket']
     
-    safe_types = safe_types_night # + safe_types_day
+    if time <= 22 and time >= 8:
+        safe_types = safe_types_night + safe_types_day
+    else:
+        safe_types = safe_types_night
     
     for place in data['features']:
         coords = place['geometry']['coordinates']
@@ -250,7 +254,6 @@ def get_nearby_locations():
                 add = 1
         else:
             continue
-        print(place)
         
         if add:    
             place_type = place['properties']['type'].lower()
